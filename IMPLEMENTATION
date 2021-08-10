@@ -1,0 +1,264 @@
+ 1. GETTING STARTED
+====================
+You’ll first have to sign up for a PubNub account to get your unique publish/subscribe keys.
+Then, install PubNub package using the following command in your terminal.
+   --> npm install --save pubnub pubnub-react@1 
+
+   import PubNubReact from 'pubnub-react';
+   import React, { Component } from 'react';
+   import { Route } from 'react-router-dom';
+   import PropTypes from 'prop-types'
+
+PubNub React is a wrapper of PubNub Javascript. It adds a few extra features to simplify 
+the integration with React. In order to get the integration between your React’s Component 
+and PubNub, PubNubReact will be the way to get this without any kind of difficulty or extra job 
+when you need to render data in your UI.
+
+ 2.CREADENTIALS
+==================
+constructor(props) {
+  super(props);
+  this.pubnub = new PubNubReact({
+    publishKey: 'pub-c-b73dcd4e-31a8-4c62-9a7b-bbc15ec62769',
+    subscribeKey: 'sub-c-19892308-f1a8-11eb-9d61-d6c76bc6f614'
+  });
+  this.pubnub.init(this);
+}
+
+ 3.REG PAGE
+===============
+<form onSubmit={this.handleSubmit}>
+  <ModalHeader>Live Bidding Registration</ModalHeader>
+  <ModalBody>
+    <label>Name:</label>
+    <input type="text" value={this.state.name} onChange={this.handleChangeName} className="form-control" />
+  </ModalBody>
+  <ModalFooter>
+    <Button type="submit" onClick={this.handleSubmit} color="success" className="btn btn-success">Register</Button>
+    <Button color="danger" onClick={this.toggle}>Cancel</Button>
+  </ModalFooter>
+</form>
+
+ 4.HOME PAGE
+==============
+Routing helps us build a single page application in React. 
+To use routing, we have to pull down React Router and React DOM:
+      --> npm install react-router-dom --save
+<main>
+  <Switch>
+    <Route exact path='/' component={Home}/>
+    <Route path='/products' component={Products}/>
+    <Route path='/contact' component={Contact}/>
+    <Route path='/art' component={Art}/>
+    <Route path='/about' component={About}/>
+    <Route path='/user' component={User}/>
+    <Route path='/dashboard' component={Dashboard}/>
+  </Switch>
+</main>
+
+ 5.AGRI-BID PRODUCTS
+======================
+Products — PubNub Channels
+Products here represent different channels of PubNub. 
+You can re-use React components in such a way that the buttons on 
+different art products lead you to different channels.
+
+<Cardholder name="Art 1" description="Description of Art 1" image={image9}/>
+Here’s a small code snippet of Cardholder, which can be used to build n number of products 
+by passing different product names and their associated subtitles and description.
+
+Additionally, you can make the buttons lead you to different PubNub channels based on the product.
+<Card>
+  <CardImg top width="10%" src={this.props.image} alt="Card image cap" />
+  <CardBody>
+  <CardTitle><h1>{this.props.name}</h1></CardTitle>
+  <CardSubtitle>Card subtitle</CardSubtitle>
+  <CardText>{this.props.description}</CardText>
+  <Route render={({ history}) => (
+    <Button className="btn btn-info" onClick={() => { history.push(channelName) }}>
+      Join the event
+    </Button>
+  )} />
+  </CardBody>
+</Card>
+
+ 6. PLACING BID
+================
+The most interesting part of your application is the page where you place the bid. 
+The buttons on the products page lead you to their corresponding PubNub channels, 
+which in turn lead you to the corresponding bidding pages, where you can submit the amount.
+
+<form onSubmit={this.handleSubmit} style={{marginLeft: 10 + 'em'}}>
+  <h2> Starting bid: $30 </h2>
+  <label>
+    <FormControl type="number" pattern="[0–9]*" inputMode="numeric" value={this.state.value} onChange={this.handleChange} />
+  </label>
+  <Button className="btn btn-info btn-lg" type="submit" value="Submit" style={{marginLeft: 10 + 'px'}}>Place Bid</Button>
+</form>
+
+7.PubNub Realtime Messaging
+==========================
+Once you submit your price into the input form, PubNub publishes the message to 
+the hosts of the auction through the art’s channel with 1/4th the second latency. 
+If you subscribe to the same channel, you can view the bids of various users
+who are currently participating in the bid.
+
+handleSubmit(event) {
+  var startingBid = 30;
+  var data = localStorage.getItem('Username');
+  var message = data +" : "+ this.state.value;
+  if(data != null) {
+    if(this.state.value > startingBid && this.state.value < 1000000) {
+      this.pubnub.publish({
+        message: message,
+        channel: 'art'
+      });
+    } else {
+     alert("Enter value between Starting Bid and 1000000!");
+    }
+  }else {
+    alert("Enter username!");
+  }
+  event.preventDefault();
+}
+
+componentWillMount() {
+  this.pubnub.subscribe({
+    channels: ['art'],
+    withPresence: false
+  });
+  this.pubnub.getMessage('art1', (msg) => {
+    var data = localStorage.getItem('username');
+    this.last_message = msg.message;
+  });
+}
+
+ 8.Dashboard
+============
+PubNub Realtime Messaging
+You can find out the size of the map by using {message.length} 
+and also find out the highest bid from the map and display
+it on the dashboard as follows:
+
+export default class Dashboard extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {highest: 0, people: 0};
+    this.pubnub = new PubNubReact({
+      publishKey: 'ENTER YOUR PUBLISH KEY',
+      subscribeKey: 'ENTER YOUR SUBSCRIBE KEY'
+    });
+    this.pubnub.init(this);
+  }
+
+  componentWillMount() {
+    this.pubnub.subscribe({
+      channels: ['art'],
+      withPresence: true
+    });
+    this.pubnub.getMessage('art', (msg) => {
+      this.setState ({
+        highest: msg.message
+      });
+    });
+  }
+
+  render() {
+    const messages = this.pubnub.getMessage('art');
+    return (
+      <div>
+        <Cards data={messages.length} highest={this.state.highest} people={this.state.people}/>
+        <ListGroup flush>{messages.map((m, index) => <ListGroupItem><h1 key={'message' + index}>{m.message}</h1></ListGroupItem>)}</ListGroup>
+      </div>
+    );
+  }
+}
+
+ 9.PRESENCE
+=============
+Presence delivers the status of users and devices connected to PubNub’s channels at any point under a millisecond.
+PubNub requires you to enable Presence on their PubNub Dashboard. 
+Here’s how to enable Presence. Now you can execute this piece of code to find out how many users/devices
+are connected to PubNub’s channel at the moment.
+
+this.pubnub.hereNow({
+  channels: ["art"],
+  includeState: true
+},(status,response)=> {
+    this.setState ({
+      people: response.totalOccupancy
+    });
+});
+const presence = this.pubnub.hereNow('art');
+
+Here’s how you can design the Admin Dashboard cards to display the number of bids, 
+highest bid, and the number of viewers. You can also implement graphs 
+and charts to represent these values graphically.
+
+class Cards extends Component {
+  constructor(props) {
+    super(props);
+    this.toggle = this.toggle.bind(this);
+    this.toggleFade = this.toggleFade.bind(this);
+    this.state = {
+      collapse: true,
+      fadeIn: true,
+      timeout: 300
+    };
+  }
+
+  toggle() {
+    this.setState({ collapse: !this.state.collapse });
+  }
+
+  toggleFade() {
+    this.setState((prevState) => { return { fadeIn: !prevState }});
+  }
+
+  render() {
+    return (
+      <div className="animated fadeIn">
+        <Row>
+          <Col xs="12" sm="6" md="4">
+            <Card className="text-white bg-info card text-center">
+              <CardBody>
+                <blockquote className="card-bodyquote">
+                  <header>Number of Bids</header>
+                  <h1>{this.props.data}</h1>
+                </blockquote>
+              </CardBody>
+            </Card>
+          </Col>
+          <Col xs="12" sm="6" md="4">
+            <Card className="text-white bg-warning card text-center">
+              <CardBody>
+                <blockquote className="card-bodyquote">
+                  <header>Highest bid</header>
+                  <h1>{this.props.highest}</h1>
+                </blockquote>
+              </CardBody>
+            </Card>
+          </Col>
+          <Col xs="12" sm="6" md="4">
+            <Card className="text-white bg-success card text-center">
+              <CardBody>
+                <blockquote className="card-bodyquote">
+                  <header>Users online</header>
+                  <h1>{this.props.people}</h1>
+                </blockquote>
+              </CardBody>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+    );
+  }
+}
+
+Cards.propTypes = {
+  data: PropTypes.string,
+  highest: PropTypes.string,
+  people: PropTypes.string
+};
+
+export default Cards;
